@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NBTC Data Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",Inter,Arial,sans-serif;background:#F4F6F9;color:#222;display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{width:230px;min-width:230px;background:#1F3864;color:#fff;display:flex;flex-direction:column;overflow:hidden}
+.sb-logo{padding:16px 14px 10px;border-bottom:1px solid rgba(255,255,255,.12)}
+.sb-logo h1{font-size:14px;font-weight:700;letter-spacing:.4px}
+.sb-logo p{font-size:10px;opacity:.6;margin-top:2px}
+.sb-filters{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;flex-wrap:wrap;gap:4px}
+.filter-btn{padding:2px 9px;border-radius:99px;font-size:10px;cursor:pointer;border:none;background:rgba(255,255,255,.12);color:#fff;transition:background .2s}
+.filter-btn:hover,.filter-btn.active{background:rgba(255,255,255,.28)}
+.sb-nav{overflow-y:auto;flex:1;padding:6px 0}
+.nav-item{display:block;padding:6px 14px;font-size:11.5px;color:rgba(255,255,255,.78);text-decoration:none;border-left:3px solid transparent;transition:all .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff;border-left-color:#7CB9E8}
+.nav-item.active{background:rgba(255,255,255,.15);color:#fff;border-left-color:#fff;font-weight:600}
+.sb-footer{padding:8px 12px;font-size:10px;opacity:.45;border-top:1px solid rgba(255,255,255,.1)}
+
+/* ── Main ── */
+.main{flex:1;overflow-y:auto;scroll-behavior:smooth}
+.page-header{background:#1F3864;color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.page-header h1{font-size:16px;font-weight:700}
+.page-header .meta{font-size:11px;opacity:.65}
+.content{padding:20px 28px}
+
+/* ── Dataset card ── */
+.dataset-section{background:#fff;border-radius:10px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,.07);scroll-margin-top:56px}
+.section-header{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid #EEF0F4}
+.section-header h2{font-size:14px;font-weight:700;color:#1F3864}
+.name-th{font-size:10.5px;color:#999;margin-top:3px}
+.badges{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;padding-left:12px}
+.badge{padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:600;white-space:nowrap}
+.badge-unit{background:#E8EDF5;color:#1F3864}
+.freq-quarterly{background:#D9EAD3;color:#2D6A1F}
+.freq-annual{background:#FCE5CD;color:#8B4513}
+.section-body{display:flex}
+.chart-wrap{flex:1;padding:14px 16px;min-width:0}
+.chart-div{width:100%}
+.latest-card{width:200px;min-width:200px;padding:14px 12px;border-left:1px solid #EEF0F4;background:#FAFBFD;border-radius:0 10px 10px 0;overflow-y:auto}
+.card-title{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.period-label{font-size:11.5px;font-weight:600;color:#1F3864;display:block;margin-bottom:7px}
+.kv{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:4px}
+.k{font-size:10.5px;color:#666;flex-shrink:0;max-width:95px;line-height:1.3}
+.v{font-size:11.5px;font-weight:700;color:#222;text-align:right}
+.notes-text{font-size:9.5px;color:#bbb;margin-top:12px;line-height:1.5;border-top:1px solid #eee;padding-top:9px}
+.no-data{color:#ccc;font-size:13px;padding:40px;text-align:center}
+
+@media(max-width:860px){
+  .sidebar{display:none}
+  .section-body{flex-direction:column}
+  .latest-card{width:100%;border-left:none;border-top:1px solid #EEF0F4;border-radius:0 0 10px 10px}
+  .content{padding:12px}
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sb-logo">
+    <h1>NBTC Data</h1>
+    <p>Telecom KPI Dashboard</p>
+  </div>
+  <div class="sb-filters">
+    <button class="filter-btn active" onclick="filterNav('all',this)">All</button>
+    <button class="filter-btn" onclick="filterNav('quarterly',this)">Quarterly</button>
+    <button class="filter-btn" onclick="filterNav('annual',this)">Annual</button>
+  </div>
+  <nav class="sb-nav">
+    <a href="#ds-VoicePrice" class="nav-item" data-freq="quarterly">Mobile Voice Price</a><a href="#ds-MOU" class="nav-item" data-freq="quarterly">Mobile MOU</a><a href="#ds-Penetration" class="nav-item" data-freq="quarterly">Mobile Penetration</a><a href="#ds-Subscribers" class="nav-item" data-freq="quarterly">Mobile Subscribers</a><a href="#ds-ARPU" class="nav-item" data-freq="quarterly">Mobile ARPU (excl. IC)</a><a href="#ds-Revenue" class="nav-item" data-freq="quarterly">Mobile Revenue Share</a><a href="#ds-InternetUsers" class="nav-item" data-freq="quarterly">Internet Users</a><a href="#ds-MarketValue" class="nav-item" data-freq="annual">Telecom Market Value</a><a href="#ds-MobileDataUsage" class="nav-item" data-freq="quarterly">Mobile Broadband Data Usage</a><a href="#ds-DataPerSub" class="nav-item" data-freq="quarterly">Mobile Data per Subscriber per Day</a><a href="#ds-3GCoverage" class="nav-item" data-freq="annual">3G Population Coverage</a><a href="#ds-4GCoverage" class="nav-item" data-freq="annual">4G Population Coverage</a><a href="#ds-5GCoverage" class="nav-item" data-freq="annual">5G Population Coverage</a><a href="#ds-BroadbandRate" class="nav-item" data-freq="quarterly">Mobile Broadband Penetration Rate</a><a href="#ds-BroadbandUsers" class="nav-item" data-freq="quarterly">Mobile Broadband Users</a><a href="#ds-IoTNumbers" class="nav-item" data-freq="annual">IoT Numbers</a><a href="#ds-IoTSimPct" class="nav-item" data-freq="annual">IoT SIM Penetration</a>
+  </nav>
+  <div class="sb-footer">Fetched: 2026-03-05 14:26</div>
+</div>
+
+<div class="main" id="mainScroll">
+  <div class="page-header">
+    <h1>NBTC Telecom Data Dashboard</h1>
+    <span class="meta">datacatalog.nbtc.go.th &nbsp;|&nbsp; 2026-03-05 14:26</span>
+  </div>
+  <div class="content">
+    
+    <section id="ds-VoicePrice" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile Voice Price</h2>
+          <p class="name-th">อัตราค่าบริการเสียงต่อนาทีโดยเฉลี่ย</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Baht/min</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-VoicePrice" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest: 2025 Q3</span>
+<div class='kv'><span class='k'>Blended</span><span class='v'>0.38</span></div>
+<p class='notes-text'>Blended average across all operators</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-MOU" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile MOU</h2>
+          <p class="name-th">ปริมาณการใช้งานเสียงเฉลี่ยต่อเลขหมาย</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Minute/month</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-MOU" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest: 2025 Q3</span>
+<div class='kv'><span class='k'>Blended</span><span class='v'>60.78</span></div>
+<p class='notes-text'>Minutes of Use per subscriber per month</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-Penetration" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile Penetration</h2>
+          <p class="name-th">อัตราการถือครองโทรศัพท์เคลื่อนที่</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">%</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-Penetration" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest: 2025 Q3</span>
+<div class='kv'><span class='k'>Mobile Penetration (%)</span><span class='v'>166.46</span></div>
+<p class='notes-text'>SIM penetration per 100 population</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-Subscribers" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile Subscribers</h2>
+          <p class="name-th">จำนวนเลขหมายโทรศัพท์เคลื่อนที่</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Numbers</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-Subscribers" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest: 2025 Q3</span>
+<div class='kv'><span class='k'>Total Mobile Subscribers</span><span class='v'>109,606,103.00</span></div>
+<p class='notes-text'>Registered SIM numbers by operator</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-ARPU" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile ARPU (excl. IC)</h2>
+          <p class="name-th">รายรับเฉลี่ยต่อเลขหมายไม่รวม IC</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Baht/month</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-ARPU" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest: 2025 Q3</span>
+<div class='kv'><span class='k'>Blended</span><span class='v'>228.46</span></div>
+<div class='kv'><span class='k'>Post-Paid</span><span class='v'>429.96</span></div>
+<div class='kv'><span class='k'>Pre-Paid</span><span class='v'>140.15</span></div>
+<p class='notes-text'>Average Revenue Per User excluding Interconnect</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-Revenue" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile Revenue Share</h2>
+          <p class="name-th">ส่วนแบ่งรายรับตลาดโทรศัพท์เคลื่อนที่</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">%</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-Revenue" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest: 2025 Q3</span>
+<div class='kv'><span class='k'>Other </span><span class='v'>12.81</span></div>
+<div class='kv'><span class='k'>Voice + Non - Voice</span><span class='v'>87.19</span></div>
+<p class='notes-text'>Revenue market share by operator</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-InternetUsers" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Internet Users</h2>
+          <p class="name-th">จำนวนผู้ใช้อินเทอร์เน็ต</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Numbers</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-InternetUsers" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest: 2024 Q4</span>
+<div class='kv'><span class='k'>Total Internet users</span><span class='v'>60,938,076.00</span></div>
+<p class='notes-text'>Total internet user accounts</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-MarketValue" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Telecom Market Value</h2>
+          <p class="name-th">มูลค่าตลาดสื่อสาร</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Million Baht</span>
+          <span class="badge freq-annual">Annual</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-MarketValue" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Year: 2023</span>
+<div class='kv'><span class='k'>ตลาดบริการสื่อสาร</span><span class='v'>366,396</span></div>
+<div class='kv'><span class='k'>ตลาดอุปกรณ์สื่อสาร</span><span class='v'>254,517</span></div>
+<div class='kv'><span class='k'>ตลาดอุปกรณ์โครงข่ายโทรคมนาคมหลัก</span><span class='v'>68,260</span></div>
+<p class='notes-text'>Market value by category; lowercase column names (year/category/value)</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-MobileDataUsage" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile Broadband Data Usage</h2>
+          <p class="name-th">ปริมาณการใช้งานอินเทอร์เน็ตบรอดแบนด์เคลื่อนที่</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Exabytes</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-MobileDataUsage" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2024</span>
+<div class='kv'><span class='k'>Mobile Broadband Data Usage</span><span class='v'>26.91</span></div>
+<p class='notes-text'>Total domestic mobile broadband data consumption</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-DataPerSub" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile Data per Subscriber per Day</h2>
+          <p class="name-th">ปริมาณการใช้งานอินเทอร์เน็ตเฉลี่ยต่อเลขหมายต่อวัน</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">GB/day</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-DataPerSub" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2025</span>
+<div class='kv'><span class='k'>Mobile Data per Subscriber per Day</span><span class='v'>21.85</span></div>
+<p class='notes-text'>Average daily data usage per SIM</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-3GCoverage" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>3G Population Coverage</h2>
+          <p class="name-th">สัดส่วนประชากรที่เข้าถึงสัญญาณ 3G</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">%</span>
+          <span class="badge freq-annual">Annual</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-3GCoverage" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2024</span>
+<div class='kv'><span class='k'>3G Population Coverage</span><span class='v'>98.80</span></div>
+<p class='notes-text'>Year uses Thai Buddhist calendar — converted to CE in output</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-4GCoverage" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>4G Population Coverage</h2>
+          <p class="name-th">สัดส่วนประชากรที่เข้าถึงสัญญาณ 4G</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">%</span>
+          <span class="badge freq-annual">Annual</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-4GCoverage" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2024</span>
+<div class='kv'><span class='k'>4G Population Coverage</span><span class='v'>99.00</span></div>
+<p class='notes-text'>Year uses Thai Buddhist calendar — converted to CE in output</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-5GCoverage" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>5G Population Coverage</h2>
+          <p class="name-th">สัดส่วนประชากรที่เข้าถึงสัญญาณ 5G</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">%</span>
+          <span class="badge freq-annual">Annual</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-5GCoverage" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2024</span>
+<div class='kv'><span class='k'>5G Population Coverage</span><span class='v'>95.00</span></div>
+<p class='notes-text'>Year uses Thai Buddhist calendar — converted to CE in output</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-BroadbandRate" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile Broadband Penetration Rate</h2>
+          <p class="name-th">อัตราการเข้าถึงอินเทอร์เน็ตความเร็วสูงต่อประชากร (มือถือ)</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">%</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-BroadbandRate" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2024</span>
+<div class='kv'><span class='k'>Mobile Broadband Penetration Rate</span><span class='v'>1.18</span></div>
+<p class='notes-text'>High-speed mobile internet penetration per population</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-BroadbandUsers" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>Mobile Broadband Users</h2>
+          <p class="name-th">จำนวนผู้ใช้บริการอินเทอร์เน็ตความเร็วสูงบนโทรศัพท์เคลื่อนที่</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Numbers</span>
+          <span class="badge freq-quarterly">Quarterly</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-BroadbandUsers" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2024</span>
+<div class='kv'><span class='k'>Mobile Broadband Users</span><span class='v'>77,918,294.00</span></div>
+<p class='notes-text'>Active mobile broadband subscriber count</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-IoTNumbers" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>IoT Numbers</h2>
+          <p class="name-th">จำนวนเลขหมาย IoT</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">Numbers</span>
+          <span class="badge freq-annual">Annual</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-IoTNumbers" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2024</span>
+<div class='kv'><span class='k'>IoT Numbers</span><span class='v'>2,680,000.00</span></div>
+<p class='notes-text'>Year uses Thai Buddhist calendar — converted to CE in output</p>
+        </div>
+      </div>
+    </section>
+    <section id="ds-IoTSimPct" class="dataset-section">
+      <div class="section-header">
+        <div>
+          <h2>IoT SIM Penetration</h2>
+          <p class="name-th">ร้อยละจำนวนซิมการ์ด IoT ต่อประชากรไทย</p>
+        </div>
+        <div class="badges">
+          <span class="badge badge-unit">%</span>
+          <span class="badge freq-annual">Annual</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="chart-wrap"><div id="chart-IoTSimPct" class="chart-div"></div></div>
+        <div class="latest-card">
+          <div class="card-title">Latest Data</div>
+          <span class='period-label'>Latest year: 2024</span>
+<div class='kv'><span class='k'>IoT SIM Penetration</span><span class='v'>0.04</span></div>
+<p class='notes-text'>IoT SIM cards as % of Thai population</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+Plotly.newPlot("chart-VoicePrice",[{"type": "scatter", "mode": "lines+markers", "name": "Blended", "x": ["2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [0.60311, 0.571107, 0.560051, 0.562772, 0.592687, 0.595288, 0.592657, 0.571815, 0.574549, 0.584235, 0.575969, 0.563741, 0.708812, 0.7243, 0.732239, 0.707327, 0.715456, 0.712135, 0.682704, 0.657269, 0.477446, 0.484229, 0.43179, 0.429492, 0.417344, 0.421782, 0.405511, 0.395476, 0.430455, 0.451697, 0.450186, 0.407586, 0.436667, 0.45, 0.45, 0.44, 0.418735, 0.42, 0.41, 0.43, 0.595064, 0.59, 0.6, 0.59, 0.58, 0.58, 0.58, 0.59, 0.51, 0.49, 0.48, 0.47, 0.47, 0.47, 0.47, 0.47, 0.471351, 0.509444, 0.47667, 0.498857, 0.467045, 0.450219, 0.441647, 0.44, 0.390554, 0.393507, 0.393082, 0.388601, 0.375107, 0.37992212522423746, 0.37992212522423746], "line": {"color": "#1F3864", "width": 2.5}, "marker": {"size": 5}}],{"xaxis": {"title": "Period", "tickangle": -45}, "yaxis": {"title": "Baht/min"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-MOU",[{"type": "scatter", "mode": "lines+markers", "name": "Blended", "x": ["2002 Q1", "2002 Q2", "2002 Q3", "2002 Q4", "2003 Q1", "2003 Q2", "2003 Q3", "2003 Q4", "2004 Q1", "2004 Q2", "2004 Q3", "2004 Q4", "2005 Q1", "2005 Q2", "2005 Q3", "2005 Q4", "2006 Q1", "2006 Q2", "2006 Q3", "2006 Q4", "2007 Q1", "2007 Q2", "2007 Q3", "2007 Q4", "2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [248.22676, 229.674417, 216.823021, 202.84798, 192.63939, 184.552817, 166.259536, 168.093843, 183.636837, 165.471907, 159.298399, 161.756496, 163.327329, 207.806166, 240.239906, 243.220271, 268.784592, 340.855316, 283.419239, 269.950794, 334.644594, 319.802359, 309.669005, 319.770152, 283.421267, 273.728967, 264.56184, 250.548987, 247.541695, 235.56200544312355, 235.534911, 251.680496, 253.161368, 248.011024, 250.495285, 256.842329, 315.315951, 307.816184, 300.20387, 235.941765, 240.678182, 232.900779, 236.013084, 238.138879, 310.503439, 295.138646, 275.386375, 264.159664, 260.353818, 247.736905, 244.391563, 243.720959, 232.00109, 230.2612, 235.849956, 248.123589, 226.754559, 204.538145, 192.585563, 185.422418, 176.697737, 167.303882, 163.8003, 157.922135, 174.526323, 149.284845, 143.155161, 141.343733, 133.582447, 123.036521, 119.222327, 120.625259, 117.030145, 109.65356, 109.868923, 110.024061, 102.077494, 99.912182, 100.730736, 96.496556, 93.825601, 92.220531, 86.145712, 83.859848, 84.263502, 81.712622, 79.58391, 80.997362, 80.252077, 64.910233, 64.129375, 64.336141, 62.820618, 60.779879996113245, 60.779879996113245], "line": {"color": "#1F3864", "width": 2.5}, "marker": {"size": 5}}, {"type": "scatter", "mode": "lines+markers", "name": "Post-Paid", "x": ["2002 Q1", "2002 Q2", "2002 Q3", "2002 Q4", "2003 Q1", "2003 Q2", "2003 Q3", "2003 Q4", "2004 Q1", "2004 Q2", "2004 Q3", "2004 Q4", "2005 Q1", "2005 Q2", "2005 Q3", "2005 Q4", "2006 Q1", "2006 Q2", "2006 Q3", "2006 Q4", "2007 Q1", "2007 Q2", "2007 Q3", "2007 Q4", "2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1"], "y": [391.621624, 419.274338, 440.704461, 447.465832, 457.246136, 465.112985, 464.894467, 468.320979, 502.430173, 474.007203, 457.242037, 462.456231, 456.681467, 434.293811, 440.753561, 459.608873, 513.281642, 571.513454, 609.964654, 606.106055, 662.500163, 598.456006, 615.494956, 648.07837, 620.931675, 578.755902, 551.294857, 538.743834, 532.336178, 486.630562, 484.090691, 486.447809, 470.158025, 456.101416, 467.453213, 476.878642, 524.874783, 508.571278, 507.922669, 400.314902, 423.954659, 382.123453, 388.849049, 375.24836, 459.807461, 429.220953, 428.981508, 456.154908, 387.514769, 378.780551, 372.086972, 362.889333, 352.082295, 334.579432, 333.556275, 316.982621, 297.018994, 302.208853, 294.930378, 287.001232, 272.647296, 266.604107, 262.780706, 256.750024, 328.185208, 241.977211, 239.45458, 240.65942, 232.548203, 224.650944, 224.445758, 213.18835, 207.306541, 191.384906, 192.582469, 191.252963, 183.689504, 180.946839, 184.554985, 175.171565, 171.016168, 164.816208, 157.05284, 153.78695, 153.080856, 148.997482, 142.659054, 141.125203, 139.07619], "line": {"color": "#4285F4", "width": 1.5}, "marker": {"size": 4}}, {"type": "scatter", "mode": "lines+markers", "name": "Pre-Paid", "x": ["2002 Q1", "2002 Q2", "2002 Q3", "2002 Q4", "2003 Q1", "2003 Q2", "2003 Q3", "2003 Q4", "2004 Q1", "2004 Q2", "2004 Q3", "2004 Q4", "2005 Q1", "2005 Q2", "2005 Q3", "2005 Q4", "2006 Q1", "2006 Q2", "2006 Q3", "2006 Q4", "2007 Q1", "2007 Q2", "2007 Q3", "2007 Q4", "2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1"], "y": [141.0, 130.0, 131.0, 127.0, 125.0, 122.0, 105.0, 111.0, 117.0, 103.168542, 101.292296, 104.747369, 108.459851, 166.469238, 204.589267, 205.761886, 227.839719, 308.172305, 237.13718, 221.446386, 276.887334, 274.280166, 264.381641, 276.777237, 245.455748, 240.016802, 231.984651, 216.887278, 214.56126, 207.389568, 207.665167, 225.554586, 229.483177, 225.591134, 227.165135, 233.468982, 290.135215, 284.109708, 275.131345, 217.168387, 218.90425, 214.64181, 216.795217, 220.30951, 286.000298, 272.425015, 254.330177, 237.640105, 242.577541, 228.834092, 225.431612, 225.539821, 213.672489, 211.988613, 219.106854, 237.71671, 215.818036, 186.273828, 172.63966, 164.830945, 156.778564, 144.929645, 140.248628, 133.382528, 129.274693, 121.229435, 113.424642, 110.123861, 101.486772, 89.097405, 83.146315, 88.808453, 84.854044, 78.82844, 77.757936, 77.502344, 72.844095, 70.059952, 69.074136, 66.545385, 64.103967, 61.254677, 55.779836, 53.889146, 55.63329, 53.666098, 53.15526, 56.128609, 56.13257], "line": {"color": "#EA4335", "width": 1.5}, "marker": {"size": 4}}],{"xaxis": {"title": "Period", "tickangle": -45}, "yaxis": {"title": "Minute/month"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-Penetration",[{"type": "scatter", "mode": "lines+markers", "name": "Mobile Penetration (%)", "x": ["2002 Q1", "2002 Q2", "2002 Q3", "2002 Q4", "2003 Q1", "2003 Q2", "2003 Q3", "2003 Q4", "2004 Q1", "2004 Q2", "2004 Q3", "2004 Q4", "2005 Q1", "2005 Q2", "2005 Q3", "2005 Q4", "2006 Q1", "2006 Q2", "2006 Q3", "2006 Q4", "2007 Q1", "2007 Q2", "2007 Q3", "2007 Q4", "2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [15.2477, 19.5781, 24.825, 27.5152, 29.3256, 30.9289, 32.2839, 33.7859, 35.9785, 38.2984, 39.9482, 41.787, 43.6339, 44.5619, 45.2033, 46.7906, 49.1356, 52.1207, 56.0601, 61.1911, 65.67, 71.3464, 76.0911, 80.2138, 83.163, 86.4778, 89.9131, 93.0134, 93.5523, 95.7346, 96.662, 98.579, 102.8243, 104.2229, 105.7153, 108.8061, 111.6628, 114.0776, 115.0686, 116.9684, 120.0646, 121.0859, 123.5695, 127.8542, 130.7619, 133.5228, 136.4573, 139.2195, 145.0254, 145.595, 147.2664, 149.0927, 151.1966, 153.305, 155.3937, 156.6125, 162.5142, 168.738, 174.0921, 181.5045, 183.6799, 178.3351, 181.2094, 181.1349, 186.4208, 187.6338, 188.1944, 188.1998, 183.8654, 187.0835, 189.6131, 194.7353, 199.1561, 198.1678, 180.0591, 175.7066, 177.6147, 177.315, 178.3637, 182.6311, 187.7712, 194.3649, 195.1422, 191.2739, 187.7977, 182.0727, 179.7508, 183.0674, 181.7261, 178.1061, 175.7303, 174.5637, 172.8655, 168.691, 166.4568], "line": {"color": "#4285F4", "width": 1.5}, "marker": {"size": 4}}],{"xaxis": {"title": "Period", "tickangle": -45}, "yaxis": {"title": "%"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-Subscribers",[{"type": "scatter", "mode": "lines+markers", "name": "Total Mobile Subscribers", "x": ["2002 Q1", "2002 Q2", "2002 Q3", "2002 Q4", "2003 Q1", "2003 Q2", "2003 Q3", "2003 Q4", "2004 Q1", "2004 Q2", "2004 Q3", "2004 Q4", "2005 Q1", "2005 Q2", "2005 Q3", "2005 Q4", "2006 Q1", "2006 Q2", "2006 Q3", "2006 Q4", "2007 Q1", "2007 Q2", "2007 Q3", "2007 Q4", "2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [9669909, 12416261, 15743776, 17449890, 18763102, 19788956, 20655866, 21616910, 23217311, 24714317, 25778962, 26965548, 28405210, 29009346, 29426906, 30460238, 32220153, 34177610, 36760877, 40125470, 43369104, 47117908, 50251297, 52973994, 55288401, 57492165, 59776012, 61837164, 62589298, 64049329, 64669810, 65952313, 67783003, 68704964, 69688778, 71726300, 73936422, 75535339, 76191543, 77449466, 79832962, 80512045, 82163483, 85012411, 87289554, 89132621, 91091527, 92935433, 94447366, 94818307, 95906801, 97096199, 98552642, 100030932, 101531396, 102940000, 106903190, 111018963, 114653776, 119668741, 121199328, 117784170, 119813080, 121529728, 122822736, 124352317, 124633798, 125097917, 122173569, 124366678, 126137528, 129613743, 132594791, 131881072, 119169759, 116294420, 117562201, 117350573, 118029154, 120849606, 124205688, 128498170, 129004610, 126413958, 124086345, 120268922, 118746138, 120920796, 119983135, 117519725, 115927985, 115126899, 113925792, 111117814, 109606103], "line": {"color": "#4285F4", "width": 1.5}, "marker": {"size": 4}}],{"xaxis": {"title": "Period", "tickangle": -45}, "yaxis": {"title": "Numbers"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-ARPU",[{"type": "scatter", "mode": "lines+markers", "name": "Blended", "x": ["2002 Q1", "2002 Q2", "2002 Q3", "2002 Q4", "2003 Q1", "2003 Q2", "2003 Q3", "2003 Q4", "2004 Q1", "2004 Q2", "2004 Q3", "2004 Q4", "2005 Q1", "2005 Q2", "2005 Q3", "2005 Q4", "2006 Q1", "2006 Q2", "2006 Q3", "2006 Q4", "2007 Q1", "2007 Q2", "2007 Q3", "2007 Q4", "2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [714.077761, 634.187999, 534.35786, 526.111829, 523.772709, 505.662326, 465.19336, 472.669463, 498.429911, 471.725881, 450.505941, 468.719021, 451.073544, 398.679733, 389.856415, 408.565362, 411.587375, 342.389409, 317.395069, 307.060884, 304.418924, 277.689211, 254.774745, 245.177191, 244.203663, 228.024115, 216.539351, 205.866132, 205.273251, 199.516527, 198.124443, 204.52577, 202.268978, 194.911226, 192.691915, 200.3775, 199.391803, 195.444923, 196.850301, 205.358494, 207.067873, 207.897597, 205.423039, 211.212084, 212.673971, 207.250182, 203.953921, 201.767554, 198.684183, 195.911033, 193.854302, 196.558689, 203.463838, 214.96098, 224.292597, 232.008424, 231.168327, 230.159998, 231.447794, 230.634865, 227.031399, 233.529052, 237.374566, 239.011574, 240.529289, 243.909821, 238.979556, 238.71055, 230.967835, 240.125579, 241.00863, 239.050007, 234.176364, 233.969914, 233.611362, 230.809804, 222.460766, 217.896024, 214.558226, 213.963075, 206.51464, 210.164651, 205.91872, 211.161679, 204.953093, 206.108812, 207.632269, 212.809808, 213.372192, 215.096429, 216.515429, 221.347337, 220.772439, 225.884719, 228.46080350849712], "line": {"color": "#1F3864", "width": 2.5}, "marker": {"size": 5}}, {"type": "scatter", "mode": "lines+markers", "name": "Post-Paid", "x": ["2002 Q1", "2002 Q2", "2002 Q3", "2002 Q4", "2003 Q1", "2003 Q2", "2003 Q3", "2003 Q4", "2004 Q1", "2004 Q2", "2004 Q3", "2004 Q4", "2005 Q1", "2005 Q2", "2005 Q3", "2005 Q4", "2006 Q1", "2006 Q2", "2006 Q3", "2006 Q4", "2007 Q1", "2007 Q2", "2007 Q3", "2007 Q4", "2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [1187.587656, 1165.257299, 1109.192382, 1132.792611, 1137.709788, 1178.430404, 1161.19376, 1153.970687, 1206.825134, 1222.821365, 1164.783159, 1169.354589, 1136.619833, 1063.947149, 1032.367074, 1060.680555, 1058.701281, 951.222642, 849.914629, 844.074804, 769.478685, 715.405605, 681.117075, 692.622165, 688.935254, 649.181464, 616.786635, 585.544826, 581.538749, 564.377451, 565.940164, 582.443119, 573.473412, 574.648063, 576.114479, 581.844934, 580.151744, 573.286769, 579.233744, 617.987565, 600.461385, 608.311801, 597.113836, 620.854543, 619.221452, 611.563072, 636.509214, 619.180545, 613.011535, 611.185091, 590.294807, 576.758921, 569.391738, 558.634047, 549.691636, 551.932986, 545.595456, 548.415233, 545.774639, 546.601352, 539.048319, 541.663661, 537.90971, 537.092559, 531.517505, 531.56957, 522.976261, 523.323455, 502.05978, 509.995911, 509.776189, 514.640879, 508.749881, 507.225656, 495.865139, 484.481559, 477.40908, 467.584765, 463.565189, 463.34129, 452.935018, 452.220709, 442.762688, 446.384987, 429.605992, 430.27554, 429.962473, 433.035954, 433.648219, 438.033012, 433.807086, 433.836917, 431.413379, 432.408031, 429.9562496052992], "line": {"color": "#4285F4", "width": 1.5}, "marker": {"size": 4}}, {"type": "scatter", "mode": "lines+markers", "name": "Pre-Paid", "x": ["2002 Q1", "2002 Q2", "2002 Q3", "2002 Q4", "2003 Q1", "2003 Q2", "2003 Q3", "2003 Q4", "2004 Q1", "2004 Q2", "2004 Q3", "2004 Q4", "2005 Q1", "2005 Q2", "2005 Q3", "2005 Q4", "2006 Q1", "2006 Q2", "2006 Q3", "2006 Q4", "2007 Q1", "2007 Q2", "2007 Q3", "2007 Q4", "2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [360.0, 355.0, 314.0, 338.0, 361.520611, 352.550027, 321.784678, 343.513648, 373.041866, 346.701903, 336.586948, 356.323427, 340.977264, 296.361072, 297.062551, 321.863975, 331.572002, 271.174743, 257.87948, 245.455417, 234.408527, 217.705645, 203.454824, 196.72674, 197.172499, 184.288007, 173.659362, 163.853103, 163.948818, 158.575432, 156.882474, 162.469512, 161.835246, 154.003942, 151.61798, 159.856139, 157.202413, 155.141038, 154.604649, 160.407592, 160.331249, 158.902695, 156.171139, 157.943217, 158.757766, 152.319917, 144.655365, 144.111918, 140.763903, 136.00849, 134.991631, 138.552756, 142.575046, 150.697154, 156.588065, 164.76591, 164.716858, 159.394524, 159.441088, 155.481681, 150.429737, 153.526311, 154.517489, 154.248759, 154.350023, 156.210943, 151.15674, 149.223, 146.426717, 152.218877, 150.841931, 145.792956, 139.00484, 134.817221, 134.055404, 132.034868, 125.13769, 120.995576, 116.518864, 115.557194, 110.30351, 113.311455, 110.43402, 115.318056, 110.833015, 112.076777, 113.890133, 120.223619, 121.304571, 124.073462, 126.385413, 131.759685, 131.327989, 136.060941, 140.14944885807844], "line": {"color": "#EA4335", "width": 1.5}, "marker": {"size": 4}}],{"xaxis": {"title": "Period", "tickangle": -45}, "yaxis": {"title": "Baht/month"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-Revenue",[{"type": "scatter", "mode": "lines+markers", "name": "Other ", "x": ["2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [18.9117, 17.7556, 17.2306, 16.9828, 16.1342, 14.3455, 14.9313, 15.5267, 15.784, 14.2608, 15.417300000000001, 16.1033, 24.1162, 23.3378, 23.0785, 22.3952, 21.7566, 21.2574, 20.8022, 20.9428, 20.8187, 19.8628, 14.0503, 14.5518, 13.3429, 13.2429, 13.4504, 14.0057, 14.0037, 13.9909, 12.7961, 12.48, 12.463, 12.0315, 11.7984, 11.6561, 10.9005, 10.6593, 10.6078, 10.7784, 9.0299, 10.8269, 10.8957, 10.9425, 10.6316, 10.4519, 11.57, 10.43, 9.8447, 9.6553, 9.9866, 10.0286, 10.1655, 10.1319, 9.6937, 9.6565, 9.316, 9.3147, 9.1829, 9.7235, 12.7869, 17.9321, 17.9218, 18.1087, 15.4524, 15.405, 15.4767, 15.7262, 15.3736, 14.2137, 12.8115212677678], "line": {"color": "#4285F4", "width": 1.5}, "marker": {"size": 4}}, {"type": "scatter", "mode": "lines+markers", "name": "Voice + Non - Voice", "x": ["2008 Q1", "2008 Q2", "2008 Q3", "2008 Q4", "2009 Q1", "2009 Q2", "2009 Q3", "2009 Q4", "2010 Q1", "2010 Q2", "2010 Q3", "2010 Q4", "2011 Q1", "2011 Q2", "2011 Q3", "2011 Q4", "2012 Q1", "2012 Q2", "2012 Q3", "2012 Q4", "2013 Q1", "2013 Q2", "2013 Q3", "2013 Q4", "2014 Q1", "2014 Q2", "2014 Q3", "2014 Q4", "2015 Q1", "2015 Q2", "2015 Q3", "2015 Q4", "2016 Q1", "2016 Q2", "2016 Q3", "2016 Q4", "2017 Q1", "2017 Q2", "2017 Q3", "2017 Q4", "2018 Q1", "2018 Q2", "2018 Q3", "2018 Q4", "2019 Q1", "2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3"], "y": [81.0883, 82.2444, 82.7694, 83.0172, 83.8658, 85.6545, 85.0744, 84.4733, 84.216, 85.7392, 84.5827, 83.8967, 75.8838, 76.6621, 76.9215, 77.6048, 78.2434, 78.7426, 79.1977, 79.0572, 79.1813, 80.1373, 85.9497, 85.4482, 86.6472, 86.7571, 86.5495, 85.9843, 85.9972, 86.0091, 87.2039, 87.52, 87.537, 87.9685, 88.2015, 88.3439, 89.0995, 89.3406, 89.3922, 89.2216, 90.9701, 89.1731, 89.1043, 89.0575, 89.3684, 89.5481, 88.44, 89.57, 90.1553, 90.3447, 90.0134, 89.9714, 89.8345, 89.8681, 90.3063, 90.3435, 90.684, 90.6853, 90.8171, 90.2765, 87.2131, 82.0679, 82.0782, 81.8913, 84.5476, 84.595, 84.5233, 84.2738, 84.6264, 85.7863, 87.1884787322322], "line": {"color": "#EA4335", "width": 1.5}, "marker": {"size": 4}}],{"xaxis": {"title": "Period", "tickangle": -45}, "yaxis": {"title": "%"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-InternetUsers",[{"type": "scatter", "mode": "lines+markers", "name": "Total Internet users", "x": ["2002 Q4", "2003 Q4", "2004 Q4", "2005 Q4", "2006 Q4", "2007 Q4", "2008 Q4", "2009 Q4", "2010 Q4", "2011 Q4", "2012 Q4", "2013 Q4", "2014 Q4", "2015 Q4", "2016 Q4", "2017 Q4", "2018 Q4", "2019 Q4", "2020 Q4", "2021 Q4", "2022 Q4", "2023 Q4", "2024 Q4"], "y": [4800000.0, 6000000.0, 6970000.0, 9909000.0, 11413000.0, 13416000.0, 16100000.0, 18300000.0, 19299426.802453, 21165364.597555, 23056711.738762, 26140473.0, 27653927.0, 39466260.0, 43873732.0, 45190000.0, 47559000.0, 50105000.0, 49531895.0, 52160445.0, 57975375.0, 61693794.0, 60938076.0], "line": {"color": "#4285F4", "width": 1.5}, "marker": {"size": 4}}],{"xaxis": {"title": "Period", "tickangle": -45}, "yaxis": {"title": "Numbers"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-MarketValue",[{"type": "bar", "name": "\u0e15\u0e25\u0e32\u0e14\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23\u0e2a\u0e37\u0e48\u0e2d\u0e2a\u0e32\u0e23", "x": [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "y": [275840.0, 300326.0, 309449.98, 330815.6, 339182.0, 357006.0, 364681.0, 360157.0, 359659.0, 377966.0, 366396.0], "marker": {"color": "#4285F4"}}, {"type": "bar", "name": "\u0e15\u0e25\u0e32\u0e14\u0e2d\u0e38\u0e1b\u0e01\u0e23\u0e13\u0e4c\u0e2a\u0e37\u0e48\u0e2d\u0e2a\u0e32\u0e23", "x": [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "y": [168102.0, 199415.0, 226539.0, 246513.0, 261360.0, 256914.0, 262705.0, 270093.0, 238894.0, 244526.0, 254517.0], "marker": {"color": "#EA4335"}}, {"type": "bar", "name": "\u0e15\u0e25\u0e32\u0e14\u0e2d\u0e38\u0e1b\u0e01\u0e23\u0e13\u0e4c\u0e42\u0e04\u0e23\u0e07\u0e02\u0e48\u0e32\u0e22\u0e42\u0e17\u0e23\u0e04\u0e21\u0e19\u0e32\u0e04\u0e21\u0e2b\u0e25\u0e31\u0e01", "x": [2021, 2022, 2023], "y": [73298.0, 88609.0, 68260.0], "marker": {"color": "#FBBC04"}}],{"barmode": "group", "xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "Million Baht"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-MobileDataUsage",[{"type": "bar", "name": "Value", "x": [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "y": [4.74, 7.43, 12.375, 14.30210874331667, 19.638465355836004, 24.070246450380143, 25.865, 26.905], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "y": [4.74, 7.43, 12.375, 14.30210874331667, 19.638465355836004, 24.070246450380143, 25.865, 26.905], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "Exabytes"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-DataPerSub",[{"type": "bar", "name": "Value", "x": [2022, 2022, 2022, 2022, 2023, 2023, 2023, 2023, 2024, 2024, 2024, 2024, 2025, 2025], "y": [25.400000000000002, 26.599999999999998, 15.138749999999998, 16.176250000000003, 15.845, 17.54, 18.859999999999996, 22.345714285714287, 21.18, 21.191428571428577, 18.917142857142856, 14.657142857142858, 14.092857142857143, 21.85], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2022, 2022, 2022, 2022, 2023, 2023, 2023, 2023, 2024, 2024, 2024, 2024, 2025, 2025], "y": [25.400000000000002, 26.599999999999998, 15.138749999999998, 16.176250000000003, 15.845, 17.54, 18.859999999999996, 22.345714285714287, 21.18, 21.191428571428577, 18.917142857142856, 14.657142857142858, 14.092857142857143, 21.85], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "GB/day"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-3GCoverage",[{"type": "bar", "name": "Value", "x": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "y": [98.0, 98.0, 98.0, 98.0, 98.8, 98.8, 98.8, 98.8, 98.8], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "y": [98.0, 98.0, 98.0, 98.0, 98.8, 98.8, 98.8, 98.8, 98.8], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "%"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-4GCoverage",[{"type": "bar", "name": "Value", "x": [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "y": [98, 98, 98, 98, 98, 98, 99, 99], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "y": [98, 98, 98, 98, 98, 98, 99, 99], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "%"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-5GCoverage",[{"type": "bar", "name": "Value", "x": [2022, 2023, 2024], "y": [86, 89, 95], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2022, 2023, 2024], "y": [86, 89, 95], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "%"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-BroadbandRate",[{"type": "bar", "name": "Value", "x": [2014, 2014, 2014, 2014, 2015, 2015, 2015, 2015, 2016, 2016, 2016, 2016, 2017, 2017, 2017, 2017, 2018, 2018, 2018, 2018, 2019, 2019, 2019, 2019, 2020, 2020, 2020, 2020, 2021, 2021, 2021, 2021, 2022, 2022, 2022, 2022, 2023, 2023, 2023, 2023, 2024, 2024, 2024, 2024], "y": [0.5737, 0.7116, 0.782, 0.8244, 0.8641, 0.8841, 0.889, 0.9081, 0.9284, 0.9365, 0.9587, 0.9704, 0.8285, 0.8232, 0.8261, 0.8337, 0.849580459922217, 0.8585331020965173, 0.863902264932055, 0.8741210039530984, 0.8764515889162223, 0.8860324997621718, 0.8961973098225741, 0.9066841288851752, 0.915334287027326, 0.9262540975455433, 0.9421217715391402, 0.9527631877007606, 1.1234035596281342, 1.1362049265916514, 1.1492454692308585, 1.2111764865805623, 1.2425110761044198, 1.2784997928887285, 1.2985558214441326, 1.2811005821943329, 1.283213496814113, 1.2983542550938363, 1.3065893413375953, 1.1758222592701288, 1.174492291979369, 1.1776750499168325, 1.17049299473994, 1.1814535927392387], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2014, 2014, 2014, 2014, 2015, 2015, 2015, 2015, 2016, 2016, 2016, 2016, 2017, 2017, 2017, 2017, 2018, 2018, 2018, 2018, 2019, 2019, 2019, 2019, 2020, 2020, 2020, 2020, 2021, 2021, 2021, 2021, 2022, 2022, 2022, 2022, 2023, 2023, 2023, 2023, 2024, 2024, 2024, 2024], "y": [0.5737, 0.7116, 0.782, 0.8244, 0.8641, 0.8841, 0.889, 0.9081, 0.9284, 0.9365, 0.9587, 0.9704, 0.8285, 0.8232, 0.8261, 0.8337, 0.849580459922217, 0.8585331020965173, 0.863902264932055, 0.8741210039530984, 0.8764515889162223, 0.8860324997621718, 0.8961973098225741, 0.9066841288851752, 0.915334287027326, 0.9262540975455433, 0.9421217715391402, 0.9527631877007606, 1.1234035596281342, 1.1362049265916514, 1.1492454692308585, 1.2111764865805623, 1.2425110761044198, 1.2784997928887285, 1.2985558214441326, 1.2811005821943329, 1.283213496814113, 1.2983542550938363, 1.3065893413375953, 1.1758222592701288, 1.174492291979369, 1.1776750499168325, 1.17049299473994, 1.1814535927392387], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "%"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-BroadbandUsers",[{"type": "bar", "name": "Value", "x": [2014, 2014, 2014, 2014, 2015, 2015, 2015, 2015, 2016, 2016, 2016, 2016, 2017, 2017, 2017, 2017, 2018, 2018, 2018, 2018, 2019, 2019, 2019, 2019, 2020, 2020, 2020, 2020, 2021, 2021, 2021, 2021, 2022, 2022, 2022, 2022, 2023, 2023, 2023, 2023, 2024, 2024, 2024, 2024], "y": [37362511, 46342810, 50926829, 53688882, 56795894, 58110356, 58433157, 59688364, 61213211, 61744321, 63207777, 63977482, 54837300, 54486876, 54678409, 55178516, 56273203, 56910098, 57323294, 58053854, 58237818, 58900383, 59618309, 60347930, 60941409, 61642402, 62352416, 63060277, 74349629, 75196295, 76049379, 80145291, 82188820, 84523929, 85844788, 84668546, 84786925, 85762570, 86315274, 77666135, 77544876, 77706514, 77216568, 77918294], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2014, 2014, 2014, 2014, 2015, 2015, 2015, 2015, 2016, 2016, 2016, 2016, 2017, 2017, 2017, 2017, 2018, 2018, 2018, 2018, 2019, 2019, 2019, 2019, 2020, 2020, 2020, 2020, 2021, 2021, 2021, 2021, 2022, 2022, 2022, 2022, 2023, 2023, 2023, 2023, 2024, 2024, 2024, 2024], "y": [37362511, 46342810, 50926829, 53688882, 56795894, 58110356, 58433157, 59688364, 61213211, 61744321, 63207777, 63977482, 54837300, 54486876, 54678409, 55178516, 56273203, 56910098, 57323294, 58053854, 58237818, 58900383, 59618309, 60347930, 60941409, 61642402, 62352416, 63060277, 74349629, 75196295, 76049379, 80145291, 82188820, 84523929, 85844788, 84668546, 84786925, 85762570, 86315274, 77666135, 77544876, 77706514, 77216568, 77918294], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "Numbers"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-IoTNumbers",[{"type": "bar", "name": "Value", "x": [2021, 2022, 2023, 2024], "y": [403804, 553808, 1215361, 2680000], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2021, 2022, 2023, 2024], "y": [403804, 553808, 1215361, 2680000], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "Numbers"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});Plotly.newPlot("chart-IoTSimPct",[{"type": "bar", "name": "Value", "x": [2021, 2022, 2023, 2024], "y": [0.006102391093535082, 0.008379543345693914, 0.018399892267702042, 0.04063610053553225], "marker": {"color": "#7CB9E8", "opacity": 0.8}}, {"type": "scatter", "mode": "lines+markers", "name": "Trend", "x": [2021, 2022, 2023, 2024], "y": [0.006102391093535082, 0.008379543345693914, 0.018399892267702042, 0.04063610053553225], "line": {"color": "#1F3864", "width": 2}, "marker": {"size": 6, "color": "#1F3864"}}],{"xaxis": {"title": "Year", "tickmode": "linear", "dtick": 1}, "yaxis": {"title": "%"}, "height": 400, "margin": {"l": 60, "r": 16, "t": 24, "b": 80}, "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}, "plot_bgcolor": "#FAFAFA", "paper_bgcolor": "#FFFFFF", "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11}, "hovermode": "x unified"},{"responsive":true,"displayModeBar":true,"modeBarButtonsToRemove":["lasso2d","select2d"]});
+
+// Active nav highlight on scroll
+const mainEl = document.getElementById("mainScroll");
+const allSections = document.querySelectorAll(".dataset-section");
+const navLinks = document.querySelectorAll(".nav-item");
+function updateActive() {
+  let cur = "";
+  allSections.forEach(s => { if (mainEl.scrollTop + 70 >= s.offsetTop) cur = s.id; });
+  navLinks.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + cur));
+}
+mainEl.addEventListener("scroll", updateActive);
+updateActive();
+
+// Sidebar filter
+function filterNav(freq, btn) {
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  navLinks.forEach(a => { a.style.display = (freq === "all" || a.dataset.freq === freq) ? "" : "none"; });
+}
+</script>
+</body>
+</html>
